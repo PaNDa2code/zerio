@@ -10,11 +10,45 @@ pub fn build(b: *std.Build) void {
             .root_module = b.createModule(.{
                 .target = target,
                 .optimize = optimize,
-                .link_libc = true,
+                .link_libc = true, // doesn't mean it will use it
             }),
         });
 
+        if (target.query.isNative()) {
+            liburing.root_module.linkSystemLibrary("liburing", .{});
+            break :blk liburing;
+        }
+
         if (b.lazyDependency("liburing", .{})) |dep| {
+            const compat_h = dep.builder.addWriteFile("src/include/liburing/compat.h",
+                \\#ifndef LIBURING_COMPAT_H
+                \\#define LIBURING_COMPAT_H
+                \\#include <linux/time_types.h>
+                \\#include <linux/openat2.h>
+                \\#include <linux/futex.h>
+                \\#include <linux/blkdev.h>
+                \\#include <sys/wait.h>
+                \\#endif
+            );
+
+            const config_header = dep.builder.addConfigHeader(.{}, .{
+                .CONFIG_NOLIBC = {},
+                .CONFIG_HAVE_KERNEL_RWF_T = {},
+                .CONFIG_HAVE_KERNEL_TIMESPEC = {},
+                .CONFIG_HAVE_OPEN_HOW = {},
+                .CONFIG_HAVE_STATX = {},
+                .CONFIG_HAVE_GLIBC_STATX = {},
+                .CONFIG_HAVE_CXX = {},
+                .CONFIG_HAVE_UCONTEXT = {},
+                .CONFIG_HAVE_STRINGOP_OVERFLOW = {},
+                .CONFIG_HAVE_ARRAY_BOUNDS = {},
+                .CONFIG_HAVE_MEMFD_CREATE = {},
+                .CONFIG_HAVE_NVME_URING = {},
+                .CONFIG_HAVE_FANOTIFY = {},
+                .CONFIG_HAVE_FUTEXV = {},
+                .CONFIG_HAVE_UBLK_HEADER = {},
+            });
+
             liburing.root_module.addCSourceFiles(.{
                 .root = dep.path("src"),
                 .files = &.{
@@ -23,19 +57,25 @@ pub fn build(b: *std.Build) void {
                     "register.c",
                     "syscall.c",
                     "version.c",
+                    "nolibc.c",
+                },
+                .flags = &.{
+                    "-D_GNU_SOURCE",
+                    "-D_FILE_OFFSET_BITS=64",
+                    "-D_LARGEFILE_SOURCE",
+                    "-includeconfig.h"
                 },
             });
+
             liburing.installHeadersDirectory(dep.path("src/include"), "", .{});
             liburing.root_module.addIncludePath(dep.path("src/include"));
             liburing.root_module.addIncludePath(dep.path("src/arch"));
             liburing.root_module.addIncludePath(dep.path("src"));
-            liburing.root_module.addCMacro("_GNU_SOURCE", "");
-            liburing.root_module.addCMacro("_FILE_OFFSET_BITS", "64");
-            liburing.root_module.addCMacro("_LARGEFILE_SOURCE", "");
 
+            liburing.root_module.addConfigHeader(config_header);
+
+            liburing.step.dependOn(&compat_h.step);
         }
-
-        b.installArtifact(liburing);
 
         break :blk liburing;
     };
