@@ -1,5 +1,3 @@
-const std = @import("std");
-
 pub const Context = struct {
     ring: c.io_uring,
 
@@ -64,33 +62,13 @@ pub const Context = struct {
     }
 };
 
-pub const RequestOp = enum { read, write, none };
-
-pub const Request = struct {
-    // the data word that will be submited with the queued entry
-    token: usize,
-    fd: u32,
-    op_data: union(RequestOp) {
-        read: []u8,
-        write: []const u8,
-        none: void,
-    },
-
-    user_data: ?*anyopaque,
-};
-
-pub const Result = struct {
-    req: *Request,
-    od_res: union(RequestOp) {
-        read: usize,
-        write: usize,
-        none,
-    },
-};
+const root = @import("../root.zig");
+const Request = root.Request;
+const RequestOp = root.RequestOp;
+const Result = root.Result;
 
 const c = @cImport({
     @cInclude("liburing.h");
-    @cInclude("unistd.h");
 });
 
 export fn io_uring_load_sq_head(ring: *const c.io_uring) c_uint {
@@ -100,18 +78,23 @@ export fn io_uring_load_sq_head(ring: *const c.io_uring) c_uint {
 }
 
 test "io_uring pipe write test" {
+    const std = @import("std");
+    const c_unistd = @cImport({
+        @cInclude("unistd.h");
+    });
+
     var context: Context = undefined;
     try context.setup();
     defer context.close();
 
     // Create a pipe
     var fds: [2]c_int = undefined;
-    if (c.pipe(&fds) != 0) {
+    if (c_unistd.pipe(&fds) != 0) {
         std.debug.print("pipe creation failed\n", .{});
         return;
     }
-    defer _ = c.close(fds[0]);
-    defer _ = c.close(fds[1]);
+    defer _ = c_unistd.close(fds[0]);
+    defer _ = c_unistd.close(fds[1]);
 
     // Buffer to write
     const buf: []const u8 = @as([1000]u8, @splat(0xAA))[0..];
@@ -133,6 +116,6 @@ test "io_uring pipe write test" {
     try std.testing.expect(res == buf.len);
 
     var read_buf: [1002]u8 = undefined;
-    const n = c.read(fds[0], &read_buf, @intCast(read_buf.len));
+    const n = c_unistd.read(fds[0], &read_buf, @intCast(read_buf.len));
     try std.testing.expectEqualSlices(u8, buf[0..], read_buf[0..@intCast(n)]);
 }
