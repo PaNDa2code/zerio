@@ -64,7 +64,7 @@ pub const Context = struct {
 
 const root = @import("../root.zig");
 const Request = root.Request;
-const RequestOp = root.RequestOp;
+const Operation = root.Operation;
 const Result = root.Result;
 
 const c = @cImport({
