@@ -1,5 +1,5 @@
 const std = @import("std");
-const Backend = @import("backend/liburing.zig");
+const Backend = @import("backend/io_uring.zig");
 
 const EventLoop = struct {
     ctx: Backend.Context,
