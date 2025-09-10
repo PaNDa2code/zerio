@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Backend = @import("backend/io_uring.zig");
 
 const EventLoop = struct {
@@ -8,16 +9,19 @@ const EventLoop = struct {
 pub const Operation = enum { read, write, none };
 
 pub const Request = struct {
+    const ControlBlock = Backend.Context.ControlBlock;
+
     // the data word that will be submited with the queued entry
     token: usize,
-    fd: u32,
+    handle: if (builtin.os.tag == .windows) usize else u32,
     op_data: union(Operation) {
         read: []u8,
         write: []const u8,
         none: void,
     },
+    control_block: ControlBlock = std.mem.zeroes(ControlBlock), 
 
-    user_data: ?*anyopaque,
+    user_data: ?*anyopaque = null,
 };
 
 pub const Result = struct {

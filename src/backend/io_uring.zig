@@ -1,4 +1,6 @@
 pub const Context = struct {
+    pub const ControlBlock = void;
+
     ring: c.io_uring,
 
     pub fn setup(self: *Context) !void {
@@ -8,6 +10,10 @@ pub const Context = struct {
     pub fn close(self: *const Context) void {
         c.io_uring_queue_exit(@ptrCast(@constCast(&self.ring)));
     }
+    pub fn register(self: *const Context, req: *const Request) !void {
+        _ = self;
+        _ = req;
+    }
 
     /// The `Request` must outlive its dequeuing.
     pub fn queue(self: *const Context, req: *const Request) !void {
@@ -15,10 +21,10 @@ pub const Context = struct {
         if (sqe == null) return error.QueueFull;
         switch (req.op_data) {
             .read => |buf| {
-                c.io_uring_prep_read(sqe, @intCast(req.fd), buf.ptr, @intCast(buf.len), 0);
+                c.io_uring_prep_read(sqe, @intCast(req.handle), buf.ptr, @intCast(buf.len), 0);
             },
             .write => |buf| {
-                c.io_uring_prep_write(sqe, @intCast(req.fd), buf.ptr, @intCast(buf.len), 0);
+                c.io_uring_prep_write(sqe, @intCast(req.handle), buf.ptr, @intCast(buf.len), 0);
             },
             .none => {},
         }
@@ -102,7 +108,7 @@ test "io_uring pipe write test" {
     // Queue a write to the pipe's write end
     var req = Request{
         .token = 1,
-        .fd = @intCast(fds[1]),
+        .handle = @intCast(fds[1]),
         .op_data = .{ .write = buf },
         .user_data = null,
     };
