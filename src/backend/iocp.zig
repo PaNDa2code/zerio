@@ -94,46 +94,75 @@ const CloseHandle = windows.CloseHandle;
 const ReadFile = kernel32.ReadFile;
 const WriteFile = kernel32.WriteFile;
 
-test "iocp pipe write test (Windows)" {
+test "iocp overlapped pipe write test (Windows)" {
     const std = @import("std");
-    const c = @cImport({
-        @cInclude("io.h");
-        @cInclude("fcntl.h");
-    });
 
     var context: Context = undefined;
     try context.setup();
     defer context.close();
 
-    // Create a pipe
-    var fds: [2]c_int = undefined;
+    const pipe_name_w = std.unicode.utf8ToUtf16LeStringLiteral("\\\\.\\pipe\\zig_test_pipe");
 
-    if (c._pipe(&fds, 4096, c._O_BINARY) != 0) {
-        std.debug.print("pipe creation failed\n", .{});
-        return;
-    }
+    // Create server pipe (overlapped)
+    const server = kernel32.CreateNamedPipeW(
+        pipe_name_w.ptr,
+        windows.PIPE_ACCESS_DUPLEX | windows.FILE_FLAG_OVERLAPPED,
+        windows.PIPE_TYPE_BYTE | windows.PIPE_READMODE_BYTE | windows.PIPE_WAIT,
+        1,
+        4096,
+        4096,
+        0,
+        null,
+    );
+    if (server == windows.INVALID_HANDLE_VALUE) return error.PipeCreationFailed;
+    defer _ = windows.CloseHandle(server);
 
-    defer _ = c._close(fds[0]);
-    defer _ = c._close(fds[1]);
+    // Create client pipe (overlapped)
+    const client = kernel32.CreateFileW(
+        pipe_name_w.ptr,
+        windows.GENERIC_READ | windows.GENERIC_WRITE,
+        0,
+        null,
+        windows.OPEN_EXISTING,
+        windows.FILE_FLAG_OVERLAPPED,
+        null,
+    );
+    if (client == windows.INVALID_HANDLE_VALUE) return error.PipeCreationFailed;
+    defer _ = windows.CloseHandle(client);
 
+    // Queue a write on the client handle
     const buf: []const u8 = @as([1000]u8, @splat(0xAA))[0..];
 
-    var req = Request{
+    var write_req = Request{
         .token = 1,
-        .handle = @ptrFromInt(@as(usize, @intCast(fds[1]))),
+        .handle = client,
         .op_data = .{ .write = buf },
         .user_data = null,
     };
-
-    try context.queue(&req);
+    try context.queue(&write_req);
     try context.submit();
 
-    var res: i32 = 0;
-    const completed_req = try context.dequeue(&res);
-    try std.testing.expect(completed_req == &req);
-    try std.testing.expect(res == buf.len);
+    var write_res: i32 = 0;
+    const completed_write = try context.dequeue(&write_res);
+    try std.testing.expect(completed_write == &write_req);
+    try std.testing.expect(write_res == buf.len);
 
+    // Queue a read on the server handle
     var read_buf: [1002]u8 = undefined;
-    const n = c._read(fds[0], &read_buf, @intCast(read_buf.len));
-    try std.testing.expectEqualSlices(u8, buf[0..], read_buf[0..@intCast(n)]);
+
+    var read_req = Request{
+        .token = 2,
+        .handle = server,
+        .op_data = .{ .read = read_buf[0..] },
+        .user_data = null,
+    };
+    try context.queue(&read_req);
+    try context.submit();
+
+    var read_res: i32 = 0;
+    const completed_read = try context.dequeue(&read_res);
+    try std.testing.expect(completed_read == &read_req);
+    try std.testing.expect(read_res == buf.len);
+
+    try std.testing.expectEqualSlices(u8, buf[0..], read_buf[0..@intCast(read_res)]);
 }
