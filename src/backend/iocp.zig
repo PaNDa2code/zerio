@@ -93,3 +93,60 @@ const GetQueuedCompletionStatus = windows.GetQueuedCompletionStatus;
 const CloseHandle = windows.CloseHandle;
 const ReadFile = kernel32.ReadFile;
 const WriteFile = kernel32.WriteFile;
+
+test "iocp pipe write test (Windows)" {
+    const std = @import("std");
+
+    var context: Context = undefined;
+    try context.setup();
+    defer context.close();
+
+    // Create a pipe (Windows API)
+    var read_handle: windows.HANDLE = undefined;
+    var write_handle: windows.HANDLE = undefined;
+    try windows.CreatePipe(&read_handle, &write_handle, &.{
+        .nLength = @sizeOf(@This()),
+        .lpSecurityDescriptor = null,
+        .bInheritHandle = 0,
+    });
+    defer _ = windows.CloseHandle(read_handle);
+    defer _ = windows.CloseHandle(write_handle);
+
+    // Register handles with IOCP
+    var read_req = Request{
+        .token = 1,
+        .handle = read_handle,
+        .op_data = .none,
+        .user_data = null,
+    };
+    var write_req = Request{
+        .token = 2,
+        .handle = write_handle,
+        .op_data = .none,
+        .user_data = null,
+    };
+    try context.register(&read_req);
+    try context.register(&write_req);
+
+    // Buffer to write
+    var buf: [1000]u8 = undefined;
+    @memset(&buf, 0xAA);
+
+    // Queue a write on the write end
+    write_req.op_data = .{ .write = buf[0..] };
+    try context.queue(&write_req);
+    try context.submit();
+
+    var res: i32 = 0;
+    const completed_req = try context.dequeue(&res);
+    try std.testing.expect(completed_req == &write_req);
+    try std.testing.expect(res == buf.len);
+
+    // Now read from the read end
+    var read_buf: [1002]u8 = undefined;
+    var bytes_read: windows.DWORD = 0;
+    if (kernel32.ReadFile(read_handle, &read_buf, read_buf.len, &bytes_read, null) == 0) {
+        return error.ReadFailed;
+    }
+    try std.testing.expectEqualSlices(u8, buf[0..], read_buf[0..bytes_read]);
+}
