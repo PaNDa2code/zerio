@@ -11,7 +11,8 @@ pub fn build(b: *std.Build) void {
         .link_libc = true,
     });
 
-    mod.linkSystemLibrary("liburing", .{});
+    if (target.result.os.tag == .linux)
+        mod.linkSystemLibrary("liburing", .{});
 
     const mod_tests = b.addTest(.{
         .root_module = mod,

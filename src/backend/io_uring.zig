@@ -1,6 +1,4 @@
 pub const Context = struct {
-    pub const ControlBlock = void;
-
     ring: c.io_uring,
 
     pub fn setup(self: *Context) !void {
@@ -67,6 +65,8 @@ pub const Context = struct {
         return @ptrFromInt(@as(usize, @intCast(cqe.?.user_data)));
     }
 };
+
+pub const ControlBlock = void;
 
 const root = @import("../root.zig");
 const Request = root.Request;

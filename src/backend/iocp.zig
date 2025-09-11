@@ -1,6 +1,4 @@
 pub const Context = struct {
-    pub const ControlBlock = OVERLAPPED;
-
     iocp: windows.HANDLE,
 
     pub fn setup(self: *Context) !void {
@@ -51,7 +49,7 @@ pub const Context = struct {
     }
 
     pub fn dequeue(self: *const Context, res: *i32) !*const Request {
-        self.dequeue_timeout(INFINITE, res);
+        return (try self.dequeue_timeout(INFINITE, res)) orelse unreachable;
     }
 
     pub fn dequeue_timeout(self: *const Context, timeout_ms: u32, res: *i32) !?*const Request {
@@ -68,14 +66,16 @@ pub const Context = struct {
 
         switch (stat) {
             .Normal => {
-                res = @intCast(bytes);
+                res.* = @intCast(bytes);
                 return @ptrFromInt(request_address);
             },
-            .TimeOut => return null,
+            .Timeout => return null,
             else => return windows.unexpectedError(windows.GetLastError()),
         }
     }
 };
+
+pub const ControlBlock = OVERLAPPED;
 
 const root = @import("../root.zig");
 const Request = root.Request;
