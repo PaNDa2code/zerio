@@ -107,10 +107,8 @@ test "io_uring pipe write test" {
 
     // Queue a write to the pipe's write end
     var req = Request{
-        .token = 1,
         .handle = @intCast(fds[1]),
         .op_data = .{ .write = buf },
-        .user_data = null,
     };
 
     try context.queue(&req);

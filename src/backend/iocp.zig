@@ -134,7 +134,6 @@ test "iocp overlapped pipe write test (Windows)" {
     const buf: []const u8 = @as([1000]u8, @splat(0xAA))[0..];
 
     var write_req = Request{
-        .token = 1,
         .handle = client,
         .op_data = .{ .write = buf },
         .user_data = null,
@@ -152,7 +151,6 @@ test "iocp overlapped pipe write test (Windows)" {
     var read_buf: [1002]u8 = undefined;
 
     var read_req = Request{
-        .token = 2,
         .handle = server,
         .op_data = .{ .read = read_buf[0..] },
         .user_data = null,
