@@ -54,7 +54,7 @@ pub fn write(
     self: *EventLoop,
     file: std.fs.File,
     buf: []const u8,
-    completion_callback: ?*const fn (*Event, ?*anyopaque) CallbackAction,
+    completion_callback: ?*const fn (*Event, usize, ?*anyopaque) CallbackAction,
 ) !void {
     try self.pushAndRunRequest(.{
         .handle = @intCast(file.handle),
@@ -68,7 +68,7 @@ pub fn poll(self: *EventLoop) !void {
     const event: *Event = @fieldParentPtr("request", @constCast(completed_req));
 
     if (event.completion_callback) |cb| {
-        switch (cb(event, event.user_data)) {
+        switch (cb(event, @intCast(res), event.user_data)) {
             .destroy => {
                 self.free_events.appendAssumeCapacity(
                     (@intFromPtr(event) - @intFromPtr(self.event_queue.ptr)) / @sizeOf(Event),
@@ -144,7 +144,7 @@ test "event loop basic pipe rw" {
 
 var counter: usize = 0;
 
-fn read_cb(ev: *EventLoop.Event, _: ?*anyopaque) EventLoop.CallbackAction {
+fn read_cb(ev: *EventLoop.Event, _: usize, _: ?*anyopaque) EventLoop.CallbackAction {
     const buf = ev.request.op_data.read;
     std.testing.expectEqualStrings("hello", buf[0..5]) catch unreachable;
 
@@ -154,8 +154,7 @@ fn read_cb(ev: *EventLoop.Event, _: ?*anyopaque) EventLoop.CallbackAction {
     return .retry;
 }
 
-fn write_cb(_: *EventLoop.Event, _: ?*anyopaque) EventLoop.CallbackAction {
-
+fn write_cb(_: *EventLoop.Event, _: usize, _: ?*anyopaque) EventLoop.CallbackAction {
     counter += 1;
 
     if (counter >= 100)
