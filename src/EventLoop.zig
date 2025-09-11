@@ -1,5 +1,7 @@
 const EventLoop = @This();
 
+pub const Callback = *const fn (*Event, usize, ?*anyopaque) CallbackAction;
+
 pub const CallbackAction = enum {
     keep,
     retry,
@@ -11,7 +13,7 @@ pub const Event = struct {
 
     request: Request,
     status: Status = .none,
-    completion_callback: ?*const fn (*Event, ?*anyopaque) CallbackAction = null,
+    completion_callback: ?Callback = null,
     user_data: ?*anyopaque = null,
 };
 
@@ -42,7 +44,7 @@ pub fn read(
     self: *EventLoop,
     file: std.fs.File,
     buf: []u8,
-    completion_callback: ?*const fn (*Event, ?*anyopaque) CallbackAction,
+    completion_callback: ?Callback
 ) !void {
     try self.pushAndRunRequest(.{
         .handle = @intCast(file.handle),
@@ -54,7 +56,7 @@ pub fn write(
     self: *EventLoop,
     file: std.fs.File,
     buf: []const u8,
-    completion_callback: ?*const fn (*Event, usize, ?*anyopaque) CallbackAction,
+    completion_callback: ?Callback
 ) !void {
     try self.pushAndRunRequest(.{
         .handle = @intCast(file.handle),
