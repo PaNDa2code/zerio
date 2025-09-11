@@ -47,11 +47,11 @@ pub const Context = struct {
         return @ptrFromInt(@as(usize, @intCast(cqe.?.user_data)));
     }
 
-    pub fn dequeue_timeout(self: *const Context, timeout_ns: u32, res: *i32) !?*const Request {
+    pub fn dequeue_timeout(self: *const Context, timeout_ms: u32, res: *i32) !?*const Request {
         var cqe: ?*c.io_uring_cqe = null;
 
         var timeout = c.struct___kernel_timespec{
-            .tv_nsec = timeout_ns,
+            .tv_nsec = timeout_ms * 1000,
         };
 
         const ret = c.io_uring_wait_cqe_timeout(@ptrCast(@constCast(&self.ring)), &cqe, &timeout);

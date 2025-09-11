@@ -51,11 +51,29 @@ pub const Context = struct {
     }
 
     pub fn dequeue(self: *const Context, res: *i32) !*const Request {
-        // TODO
+        self.dequeue_timeout(INFINITE, res);
     }
 
-    pub fn dequeue_timeout(self: *const Context, timeout_ns: u32, res: *i32) !?*const Request {
-        // TODO
+    pub fn dequeue_timeout(self: *const Context, timeout_ms: u32, res: *i32) !?*const Request {
+        var bytes: u32 = 0;
+        var overlapped: ?*OVERLAPPED = null;
+        var request_address: usize = 0;
+        const stat = GetQueuedCompletionStatus(
+            self.iocp,
+            &bytes,
+            &request_address,
+            &overlapped,
+            timeout_ms,
+        );
+
+        switch (stat) {
+            .Normal => {
+                res = @intCast(bytes);
+                return @ptrFromInt(request_address);
+            },
+            .TimeOut => return null,
+            else => return windows.unexpectedError(windows.GetLastError()),
+        }
     }
 };
 
@@ -68,8 +86,10 @@ const windows = @import("std").os.windows;
 const kernel32 = windows.kernel32;
 const HANDLE = windows.HANDLE;
 const INVALID_HANDLE_VALUE = windows.INVALID_HANDLE_VALUE;
+const INFINITE = windows.INFINITE;
 const OVERLAPPED = windows.OVERLAPPED;
 const CreateIoCompletionPort = windows.CreateIoCompletionPort;
+const GetQueuedCompletionStatus = windows.GetQueuedCompletionStatus;
 const CloseHandle = windows.CloseHandle;
 const ReadFile = kernel32.ReadFile;
 const WriteFile = kernel32.WriteFile;
