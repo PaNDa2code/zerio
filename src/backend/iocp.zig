@@ -106,8 +106,8 @@ test "iocp overlapped pipe write test (Windows)" {
     // Create server pipe (overlapped)
     const server = kernel32.CreateNamedPipeW(
         pipe_name_w.ptr,
-        windows.PIPE_ACCESS_DUPLEX | windows.FILE_FLAG_OVERLAPPED,
-        windows.PIPE_TYPE_BYTE | windows.PIPE_READMODE_BYTE | windows.PIPE_WAIT,
+        windows.PIPE_ACCESS_INBOUND | windows.FILE_FLAG_OVERLAPPED,
+        windows.PIPE_TYPE_BYTE | windows.PIPE_NOWAIT,
         1,
         4096,
         4096,
@@ -120,7 +120,7 @@ test "iocp overlapped pipe write test (Windows)" {
     // Create client pipe (overlapped)
     const client = kernel32.CreateFileW(
         pipe_name_w.ptr,
-        windows.GENERIC_READ | windows.GENERIC_WRITE,
+        windows.GENERIC_WRITE,
         0,
         null,
         windows.OPEN_EXISTING,
@@ -139,6 +139,7 @@ test "iocp overlapped pipe write test (Windows)" {
         .op_data = .{ .write = buf },
         .user_data = null,
     };
+    try context.register(&write_req);
     try context.queue(&write_req);
     try context.submit();
 
@@ -156,6 +157,7 @@ test "iocp overlapped pipe write test (Windows)" {
         .op_data = .{ .read = read_buf[0..] },
         .user_data = null,
     };
+    try context.register(&read_req);
     try context.queue(&read_req);
     try context.submit();
 
