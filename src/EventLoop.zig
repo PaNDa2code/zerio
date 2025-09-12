@@ -44,24 +44,26 @@ pub fn read(
     self: *EventLoop,
     file: std.fs.File,
     buf: []u8,
-    completion_callback: ?Callback
+    completion_callback: ?Callback,
+    user_data: ?*anyopaque,
 ) !void {
     try self.pushAndRunRequest(.{
         .handle = @intCast(file.handle),
         .op_data = .{ .read = buf },
-    }, completion_callback);
+    }, completion_callback, user_data);
 }
 
 pub fn write(
     self: *EventLoop,
     file: std.fs.File,
     buf: []const u8,
-    completion_callback: ?Callback
+    completion_callback: ?Callback,
+    user_data: ?*anyopaque,
 ) !void {
     try self.pushAndRunRequest(.{
         .handle = @intCast(file.handle),
         .op_data = .{ .write = buf },
-    }, completion_callback);
+    }, completion_callback, user_data);
 }
 
 pub fn poll(self: *EventLoop) !void {
@@ -101,7 +103,7 @@ pub fn run(self: *EventLoop) !void {
     }
 }
 
-inline fn pushAndRunRequest(self: *EventLoop, req: Request, cb: anytype) !void {
+inline fn pushAndRunRequest(self: *EventLoop, req: Request, cb: anytype, user_data: ?*anyopaque) !void {
     const ev_idx = self.free_events.pop() orelse return error.ReachedMaxEvents;
     self.event_queue[ev_idx].request = req;
     try self.backend_context.register(&self.event_queue[ev_idx].request);
@@ -109,6 +111,7 @@ inline fn pushAndRunRequest(self: *EventLoop, req: Request, cb: anytype) !void {
     try self.backend_context.submit();
 
     self.event_queue[ev_idx].completion_callback = cb;
+    self.event_queue[ev_idx].user_data = user_data;
 }
 
 pub fn deinit(self: *EventLoop, allocator: std.mem.Allocator) void {

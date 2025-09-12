@@ -55,10 +55,10 @@ pub const Context = struct {
         const ret = c.io_uring_wait_cqe_timeout(@ptrCast(@constCast(&self.ring)), &cqe, &timeout);
 
         if (ret < 0)
-            return switch (@errorFromInt(@as(u16, @intCast(-ret)))) {
-                error.ETIME => null,
-                else => |err| err,
-            };
+            return if (ret == -c.ETIME)
+                null
+            else
+                @errorFromInt(@as(u16, @intCast(-ret)));
 
         res.* = @intCast(cqe.?.res);
 
