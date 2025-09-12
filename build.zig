@@ -4,7 +4,15 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const liburing = blk: {
+    const mod = b.addModule("zerio", .{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    if (target.query.isNative()) {
+        mod.linkSystemLibrary("liburing", .{});
+    } else {
         const liburing = b.addLibrary(.{
             .name = "uring",
             .root_module = b.createModule(.{
@@ -13,11 +21,6 @@ pub fn build(b: *std.Build) void {
                 .link_libc = true, // doesn't mean it will use it
             }),
         });
-
-        if (target.query.isNative()) {
-            liburing.root_module.linkSystemLibrary("liburing", .{});
-            break :blk liburing;
-        }
 
         if (b.lazyDependency("liburing", .{})) |dep| {
             const compat_h = dep.builder.addWriteFile("src/include/liburing/compat.h",
@@ -59,12 +62,7 @@ pub fn build(b: *std.Build) void {
                     "version.c",
                     "nolibc.c",
                 },
-                .flags = &.{
-                    "-D_GNU_SOURCE",
-                    "-D_FILE_OFFSET_BITS=64",
-                    "-D_LARGEFILE_SOURCE",
-                    "-includeconfig.h"
-                },
+                .flags = &.{ "-D_GNU_SOURCE", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-includeconfig.h" },
             });
 
             liburing.installHeadersDirectory(dep.path("src/include"), "", .{});
@@ -77,16 +75,8 @@ pub fn build(b: *std.Build) void {
             liburing.step.dependOn(&compat_h.step);
         }
 
-        break :blk liburing;
-    };
-
-    const mod = b.addModule("zerio", .{
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    mod.linkLibrary(liburing);
+        mod.linkLibrary(liburing);
+    }
 
     const mod_tests = b.addTest(.{
         .root_module = mod,
