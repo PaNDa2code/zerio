@@ -48,7 +48,7 @@ pub fn read(
     user_data: ?*anyopaque,
 ) !void {
     try self.pushAndRunRequest(.{
-        .handle = @intCast(file.handle),
+        .handle = file.handle,
         .op_data = .{ .read = buf },
     }, completion_callback, user_data);
 }
@@ -61,7 +61,7 @@ pub fn write(
     user_data: ?*anyopaque,
 ) !void {
     try self.pushAndRunRequest(.{
-        .handle = @intCast(file.handle),
+        .handle = file.handle,
         .op_data = .{ .write = buf },
     }, completion_callback, user_data);
 }
@@ -77,10 +77,6 @@ pub fn poll(self: *EventLoop) !void {
                 self.free_events.appendAssumeCapacity(
                     (@intFromPtr(event) - @intFromPtr(self.event_queue.ptr)) / @sizeOf(Event),
                 );
-                std.debug.print("free {any} and busy {}", .{
-                    self.free_events.items,
-                    self.event_queue.len,
-                });
             },
             .keep => {
                 event.status = .reserved;

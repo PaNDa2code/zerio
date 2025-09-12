@@ -14,7 +14,7 @@ pub const Operation = enum { read, write, none };
 pub const Request = struct {
     const ControlBlock = Backend.ControlBlock;
 
-    handle: if (builtin.os.tag == .windows) *anyopaque else u32,
+    handle: if (builtin.os.tag == .windows) *anyopaque else i32,
     op_data: union(Operation) {
         read: []u8,
         write: []const u8,
