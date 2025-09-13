@@ -24,7 +24,9 @@ pub fn build(b: *std.Build) void {
             });
 
             if (b.lazyDependency("liburing", .{})) |dep| {
-                const compat_h = dep.builder.addWriteFile("src/include/liburing/compat.h",
+                const gen_headers = dep.builder.addWriteFiles();
+
+                _ = gen_headers.add("liburing/compat.h",
                     \\#ifndef LIBURING_COMPAT_H
                     \\#define LIBURING_COMPAT_H
                     \\#include <linux/time_types.h>
@@ -32,6 +34,16 @@ pub fn build(b: *std.Build) void {
                     \\#include <linux/futex.h>
                     \\#include <linux/blkdev.h>
                     \\#include <sys/wait.h>
+                    \\#endif
+                );
+
+                _ = gen_headers.add("liburing/io_uring_version.h",
+                    \\#ifndef LIBURING_VERSION_H
+                    \\#define LIBURING_VERSION_H
+                    \\
+                    \\#define IO_URING_VERSION_MAJOR 2
+                    \\#define IO_URING_VERSION_MINOR 12
+                    \\
                     \\#endif
                 );
 
@@ -63,17 +75,22 @@ pub fn build(b: *std.Build) void {
                         "version.c",
                         "nolibc.c",
                     },
-                    .flags = &.{ "-D_GNU_SOURCE", "-D_FILE_OFFSET_BITS=64", "-D_LARGEFILE_SOURCE", "-includeconfig.h" },
+                    .flags = &.{
+                        "-D_GNU_SOURCE",
+                        "-D_FILE_OFFSET_BITS=64",
+                        "-D_LARGEFILE_SOURCE",
+                        "-includeconfig.h",
+                    },
                 });
 
                 liburing.installHeadersDirectory(dep.path("src/include"), "", .{});
+                liburing.installHeadersDirectory(gen_headers.getDirectory(), "", .{});
                 liburing.root_module.addIncludePath(dep.path("src/include"));
                 liburing.root_module.addIncludePath(dep.path("src/arch"));
                 liburing.root_module.addIncludePath(dep.path("src"));
+                liburing.root_module.addIncludePath(gen_headers.getDirectory());
 
                 liburing.root_module.addConfigHeader(config_header);
-
-                liburing.step.dependOn(&compat_h.step);
             }
 
             mod.linkLibrary(liburing);

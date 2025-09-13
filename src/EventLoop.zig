@@ -137,8 +137,8 @@ test "event loop basic pipe rw" {
 
     var read_buf: [5]u8 = undefined;
 
-    try loop.write(write_file, "hello", write_cb);
-    try loop.read(read_file, read_buf[0..], read_cb);
+    try loop.write(write_file, "hello", write_cb, null);
+    try loop.read(read_file, read_buf[0..], read_cb, null);
 
     try loop.run();
 }
