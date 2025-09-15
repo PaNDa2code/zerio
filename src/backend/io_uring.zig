@@ -42,6 +42,9 @@ pub const Context = struct {
         if (ret < 0) return @errorFromInt(@as(u16, @intCast(-ret)));
 
         res.* = @intCast(cqe.?.res);
+
+        c.io_uring_cqe_seen(@ptrCast(@constCast(&self.ring)), cqe);
+
         return @ptrFromInt(@as(usize, @intCast(cqe.?.user_data)));
     }
 
@@ -62,6 +65,7 @@ pub const Context = struct {
 
         res.* = @intCast(cqe.?.res);
 
+        c.io_uring_cqe_seen(@ptrCast(@constCast(&self.ring)), cqe);
         return @ptrFromInt(@as(usize, @intCast(cqe.?.user_data)));
     }
 };
@@ -81,6 +85,13 @@ export fn io_uring_load_sq_head(ring: *const c.io_uring) c_uint {
     if (ring.flags & c.IORING_SETUP_SQPOLL != 0)
         return @atomicLoad(c_uint, @as(*const c_uint, @ptrCast(ring.sq.khead)), .acquire);
     return ring.sq.khead.*;
+}
+
+export fn io_uring_cq_advance(ring: *const c.io_uring, nr: c_uint) void {
+    if (nr != 0) {
+        const cq = &ring.cq;
+        @atomicStore(c_uint, cq.khead, cq.khead.* + nr, .release);
+    }
 }
 
 test "io_uring pipe write test" {
