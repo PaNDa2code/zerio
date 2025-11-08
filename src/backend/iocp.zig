@@ -1,21 +1,23 @@
 pub const Context = struct {
+    const Self = @This();
+
     iocp: windows.HANDLE,
 
-    pub fn setup(self: *Context) !void {
+    pub fn setup(self: *Self) !void {
         self.iocp =
             try CreateIoCompletionPort(INVALID_HANDLE_VALUE, null, 0, 0);
     }
 
-    pub fn close(self: *const Context) void {
+    pub fn close(self: *const Self) void {
         CloseHandle(self.iocp);
     }
 
-    pub fn register(self: *const Context, req: *const Request) !void {
+    pub fn register(self: *const Self, req: *const Request) !void {
         _ = try CreateIoCompletionPort(req.handle, self.iocp, @intFromPtr(req), 0);
     }
 
     /// The `Request` must outlive its dequeuing.
-    pub fn queue(self: *const Context, req: *const Request) !void {
+    pub fn queue(self: *const Self, req: *const Request) !void {
         _ = self;
 
         const cb_ptr: *ControlBlock = @constCast(&req.control_block);
@@ -44,15 +46,15 @@ pub const Context = struct {
         }
     }
 
-    pub fn submit(self: *const Context) !void {
+    pub fn submit(self: *const Self) !void {
         _ = self;
     }
 
-    pub fn dequeue(self: *const Context, res: *i32) !*const Request {
+    pub fn dequeue(self: *const Self, res: *i32) !*const Request {
         return (try self.dequeue_timeout(INFINITE, res)) orelse unreachable;
     }
 
-    pub fn dequeue_timeout(self: *const Context, timeout_ms: u32, res: *i32) !?*const Request {
+    pub fn dequeue_timeout(self: *const Self, timeout_ms: u32, res: *i32) !?*const Request {
         var bytes: u32 = 0;
         var overlapped: ?*OVERLAPPED = null;
         var request_address: usize = 0;
